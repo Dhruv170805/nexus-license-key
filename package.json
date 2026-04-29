@@ -1,0 +1,20 @@
+{
+  "name": "nexus-forge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone License Generation Tool",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dhruv170805/nexus-licence-key.git"
+  },
+  "main": "forge-server.js",
+  "scripts": {
+    "start": "node forge-server.js"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "mongoose": "^9.6.0"
+  }
+}
