@@ -20,9 +20,7 @@ const getClients = () => {
     } catch (e) { return []; }
 };
 
-const saveClient = (clientData) => {
-    const clients = getClients();
-    clients.unshift({ ...clientData, id: Date.now() });
+const saveClients = (clients) => {
     fs.writeFileSync(CLIENTS_FILE, JSON.stringify(clients, null, 2));
 };
 
@@ -51,8 +49,106 @@ app.post('/api/forge', (req, res) => {
         };
 
         const signed = LicenseUtils.signLicense(licenseData, privateKey);
-        saveClient(licenseData);
+        const clients = getClients();
+        clients.unshift({ ...licenseData, id: Date.now(), isActive: true });
+        saveClients(clients);
         res.json(signed);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/clients/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const updateData = req.body;
+        const privateKey = fs.readFileSync(PRIVATE_KEY_PATH, 'utf8');
+
+        const licenseData = {
+            companyName: updateData.companyName,
+            deviceId: updateData.deviceId,
+            validFrom: updateData.validFrom,
+            validTo: updateData.validTo,
+            logoPath: updateData.logoPath,
+            mongoUrl: updateData.mongoUrl,
+            ipAddress: updateData.ipAddress,
+            dns: updateData.dns,
+            subnet: updateData.subnet,
+            issuedAt: new Date().toISOString()
+        };
+
+        const signed = LicenseUtils.signLicense(licenseData, privateKey);
+        const clients = getClients();
+        const index = clients.findIndex(c => c.id == id);
+        if (index !== -1) {
+            clients[index] = { ...licenseData, id: Number(id), isActive: updateData.isActive !== undefined ? updateData.isActive : true };
+            saveClients(clients);
+        }
+        res.json(signed);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.patch('/api/clients/:id/status', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isActive } = req.body;
+        const clients = getClients();
+        const index = clients.findIndex(c => c.id == id);
+        if (index !== -1) {
+            clients[index].isActive = isActive;
+            saveClients(clients);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.patch('/api/clients/:id/extend', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { months } = req.body;
+        const privateKey = fs.readFileSync(PRIVATE_KEY_PATH, 'utf8');
+        
+        const clients = getClients();
+        const index = clients.findIndex(c => c.id == id);
+        if (index === -1) return res.status(404).json({ message: 'Client not found' });
+
+        const client = clients[index];
+        const newValidTo = new Date(client.validTo);
+        newValidTo.setMonth(newValidTo.getMonth() + months);
+
+        const licenseData = {
+            companyName: client.companyName,
+            deviceId: client.deviceId,
+            validFrom: client.validFrom,
+            validTo: newValidTo.toISOString(),
+            logoPath: client.logoPath,
+            mongoUrl: client.mongoUrl,
+            ipAddress: client.ipAddress,
+            dns: client.dns,
+            subnet: client.subnet,
+            issuedAt: new Date().toISOString()
+        };
+
+        const signed = LicenseUtils.signLicense(licenseData, privateKey);
+        clients[index].validTo = licenseData.validTo;
+        saveClients(clients);
+        res.json(signed);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/clients/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const clients = getClients();
+        const filtered = clients.filter(c => c.id != id);
+        saveClients(filtered);
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -124,6 +220,18 @@ app.get('/', (req, res) => {
             
             .toggle-btn { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
             .active-tab { background: var(--accent); color: white; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); }
+
+            .duration-btn { 
+                padding: 4px 10px; 
+                border-radius: 6px; 
+                font-size: 10px; 
+                font-weight: 700; 
+                text-transform: uppercase; 
+                background: #e2e8f0; 
+                color: #475569; 
+                transition: all 0.2s ease;
+            }
+            .duration-btn:hover { background: #2563eb; color: white; }
         </style>
     </head>
     <body class="min-h-screen p-8 lg:p-12">
@@ -146,31 +254,46 @@ app.get('/', (req, res) => {
             <div class="relative">
                 <!-- Create License View -->
                 <div id="forgeView" class="studio-card p-10 rounded-[32px] transition-all duration-500">
-                    <h2 class="text-lg font-bold mb-8 text-slate-800 flex items-center gap-2">
+                    <h2 id="formTitle" class="text-lg font-bold mb-8 text-slate-800 flex items-center gap-2">
                         <div class="w-1.5 h-6 bg-blue-500 rounded-full"></div>
                         Client Details
                     </h2>
                     <form id="forgeForm" class="space-y-6">
+                        <input type="hidden" name="id" id="editId">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Client Name</label><input name="companyName" placeholder="e.g. Acme Corp" class="w-full p-4 rounded-xl text-sm" required></div>
-                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Device ID</label><input name="deviceId" placeholder="Hardware Signature" class="w-full p-4 rounded-xl text-sm font-mono" required></div>
+                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Client Name</label><input name="companyName" id="fCompanyName" placeholder="e.g. Acme Corp" class="w-full p-4 rounded-xl text-sm" required></div>
+                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Device ID</label><input name="deviceId" id="fDeviceId" placeholder="Hardware Signature" class="w-full p-4 rounded-xl text-sm font-mono" required></div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Logo URL</label><input name="logoPath" placeholder="/uploads/logo.png" class="w-full p-4 rounded-xl text-sm"></div>
-                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Database Link</label><input name="mongoUrl" placeholder="mongodb://..." class="w-full p-4 rounded-xl text-sm"></div>
+                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Logo URL</label><input name="logoPath" id="fLogoPath" placeholder="/uploads/logo.png" class="w-full p-4 rounded-xl text-sm"></div>
+                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Database Link</label><input name="mongoUrl" id="fMongoUrl" placeholder="mongodb://..." class="w-full p-4 rounded-xl text-sm"></div>
                         </div>
                         <div class="grid grid-cols-3 gap-5">
-                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Client IP</label><input name="ipAddress" placeholder="127.0.0.1" class="w-full p-4 rounded-xl text-xs font-mono"></div>
-                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">DNS Server</label><input name="dns" placeholder="8.8.8.8" class="w-full p-4 rounded-xl text-xs font-mono"></div>
-                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Network Mask</label><input name="subnet" placeholder="255.255.0.0" class="w-full p-4 rounded-xl text-xs font-mono"></div>
+                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Client IP</label><input name="ipAddress" id="fIpAddress" placeholder="127.0.0.1" class="w-full p-4 rounded-xl text-xs font-mono"></div>
+                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">DNS Server</label><input name="dns" id="fDns" placeholder="8.8.8.8" class="w-full p-4 rounded-xl text-xs font-mono"></div>
+                            <div class="group"><label class="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-2 block">Network Mask</label><input name="subnet" id="fSubnet" placeholder="255.255.0.0" class="w-full p-4 rounded-xl text-xs font-mono"></div>
                         </div>
                         <div class="glass-panel p-8 rounded-2xl space-y-6">
                             <div class="grid grid-cols-2 gap-6">
                                 <div class="space-y-2"><label class="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Start Date</label><input name="validFrom" type="datetime-local" class="w-full p-3 rounded-lg text-xs" id="vFrom"></div>
-                                <div class="space-y-2"><label class="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Expiry Date</label><input name="validTo" type="datetime-local" class="w-full p-3 rounded-lg text-xs" id="vTo"></div>
+                                <div class="space-y-2">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <label class="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Expiry Date</label>
+                                        <div class="flex gap-1">
+                                            <button type="button" class="duration-btn" onclick="setDuration(1)">1M</button>
+                                            <button type="button" class="duration-btn" onclick="setDuration(3)">3M</button>
+                                            <button type="button" class="duration-btn" onclick="setDuration(6)">6M</button>
+                                            <button type="button" class="duration-btn" onclick="setDuration(12)">1Y</button>
+                                        </div>
+                                    </div>
+                                    <input name="validTo" type="datetime-local" class="w-full p-3 rounded-lg text-xs" id="vTo">
+                                </div>
                             </div>
                         </div>
-                        <button type="submit" class="w-full btn-blue py-5 rounded-2xl text-xs uppercase tracking-[0.2em] shadow-lg">Generate License File</button>
+                        <div class="flex gap-4">
+                            <button type="submit" id="submitBtn" class="flex-1 btn-blue py-5 rounded-2xl text-xs uppercase tracking-widest shadow-lg">Generate License File</button>
+                            <button type="button" id="cancelEdit" class="hidden px-8 py-5 rounded-xl text-xs font-bold uppercase tracking-widest bg-slate-200 text-slate-600 hover:bg-slate-300">Cancel</button>
+                        </div>
                     </form>
                 </div>
 
@@ -193,6 +316,11 @@ app.get('/', (req, res) => {
             const showRegistryBtn = document.getElementById('showRegistry');
             const forgeView = document.getElementById('forgeView');
             const registryView = document.getElementById('registryView');
+            const forgeForm = document.getElementById('forgeForm');
+            const submitBtn = document.getElementById('submitBtn');
+            const cancelEditBtn = document.getElementById('cancelEdit');
+            const formTitle = document.getElementById('formTitle');
+            const editIdInput = document.getElementById('editId');
 
             const toggleView = (target) => {
                 if (target === 'forge') {
@@ -207,10 +335,35 @@ app.get('/', (req, res) => {
                 }
             };
 
-            showForgeBtn.onclick = () => toggleView('forge');
+            const setDuration = (months) => {
+                const start = new Date(document.getElementById('vFrom').value);
+                const end = new Date(start);
+                end.setMonth(end.getMonth() + months);
+                document.getElementById('vTo').value = end.toISOString().slice(0,16);
+            };
+
+            showForgeBtn.onclick = () => { resetForm(); toggleView('forge'); };
             showRegistryBtn.onclick = () => toggleView('registry');
             document.getElementById('vFrom').value = new Date().toISOString().slice(0,16);
-            document.getElementById('vTo').value = new Date(Date.now() + 31536000000).toISOString().slice(0,16);
+            setDuration(12);
+
+            const resetForm = () => {
+                forgeForm.reset();
+                editIdInput.value = '';
+                formTitle.innerHTML = '<div class="w-1.5 h-6 bg-blue-500 rounded-full"></div> Client Details';
+                submitBtn.innerText = 'Generate License File';
+                cancelEditBtn.classList.add('hidden');
+                document.getElementById('vFrom').value = new Date().toISOString().slice(0,16);
+                setDuration(12);
+            };
+
+            cancelEditBtn.onclick = resetForm;
+
+            const downloadLicense = (signed, companyName) => {
+                const blob = new Blob([JSON.stringify(signed, null, 2)], {type: 'application/json'});
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'license-' + companyName.toLowerCase().replace(/\\s+/g, '-') + '.dat'; a.click();
+            };
 
             const refreshClients = async () => {
                 const res = await fetch('/api/clients');
@@ -220,17 +373,26 @@ app.get('/', (req, res) => {
                 if (clients.length === 0) { container.innerHTML = '<p class="text-center text-slate-400 py-20 uppercase tracking-widest text-xs">No clients found</p>'; return; }
 
                 container.innerHTML = clients.map(c => {
-                    const statusClass = new Date(c.validTo) > new Date() ? 'bg-green-100 text-green-600 border-green-200' : 'bg-red-100 text-red-600 border-red-200';
-                    const statusText = new Date(c.validTo) > new Date() ? 'Active' : 'Expired';
+                    const isActuallyActive = new Date(c.validTo) > new Date() && (c.isActive !== false);
+                    const statusClass = isActuallyActive ? 'bg-green-100 text-green-600 border-green-200' : 'bg-red-100 text-red-600 border-red-200';
+                    const statusText = isActuallyActive ? 'Active' : 'Expired/Inactive';
+                    const opacityClass = c.isActive === false ? 'opacity-60 grayscale-[0.5]' : '';
                     
                     return \`
-                        <div class="glass-panel p-8 rounded-3xl group mb-6 border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-100">
+                        <div class="glass-panel p-8 rounded-3xl group mb-6 border border-slate-100 shadow-sm hover:shadow-md hover:border-blue-100 \${opacityClass}">
                             <div class="flex justify-between items-start mb-6">
                                 <div class="space-y-1">
                                     <h3 class="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition-colors">\${c.companyName}</h3>
                                     <p class="text-[10px] text-slate-400 font-mono tracking-widest uppercase">\${c.deviceId}</p>
                                 </div>
-                                <div class="px-3 py-1 rounded-full \${statusClass} border text-[9px] font-black uppercase tracking-widest">\${statusText}</div>
+                                <div class="flex flex-col items-end gap-2">
+                                    <div class="px-3 py-1 rounded-full \${statusClass} border text-[9px] font-black uppercase tracking-widest">\${statusText}</div>
+                                    <div class="flex gap-2">
+                                        <button onclick="editClient('\${c.id}')" class="text-[9px] font-bold text-blue-600 uppercase hover:underline">Edit</button>
+                                        <button onclick="toggleStatus('\${c.id}', \${c.isActive !== false})" class="text-[9px] font-bold text-slate-500 uppercase hover:underline">\${c.isActive !== false ? 'Deactivate' : 'Activate'}</button>
+                                        <button onclick="deleteClient('\${c.id}')" class="text-[9px] font-bold text-red-600 uppercase hover:underline">Delete</button>
+                                    </div>
+                                </div>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 py-6 border-y border-slate-50">
                                 <div class="space-y-4">
@@ -246,9 +408,17 @@ app.get('/', (req, res) => {
                                     </div>
                                 </div>
                                 <div class="space-y-4">
-                                    <div>
-                                        <p class="text-[9px] text-slate-400 uppercase font-bold tracking-widest mb-2">Asset Path</p>
-                                        <p class="text-[10px] text-slate-600 font-mono">\${c.logoPath || '/uploads/logo.png'}</p>
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <p class="text-[9px] text-slate-400 uppercase font-bold tracking-widest mb-2">Asset Path</p>
+                                            <p class="text-[10px] text-slate-600 font-mono">\${c.logoPath || '/uploads/logo.png'}</p>
+                                        </div>
+                                        <div class="flex gap-1 mt-4">
+                                            <button onclick="extendLicense('\${c.id}', 1)" class="duration-btn !text-[8px] !px-1.5">+1M</button>
+                                            <button onclick="extendLicense('\${c.id}', 3)" class="duration-btn !text-[8px] !px-1.5">+3M</button>
+                                            <button onclick="extendLicense('\${c.id}', 6)" class="duration-btn !text-[8px] !px-1.5">+6M</button>
+                                            <button onclick="extendLicense('\${c.id}', 12)" class="duration-btn !text-[8px] !px-1.5">+1Y</button>
+                                        </div>
                                     </div>
                                     <div>
                                         <p class="text-[9px] text-slate-400 uppercase font-bold tracking-widest mb-2">License Dates</p>
@@ -264,19 +434,79 @@ app.get('/', (req, res) => {
                 }).join('');
             };
 
-            document.getElementById('forgeForm').onsubmit = async (e) => {
+            window.editClient = async (id) => {
+                const res = await fetch('/api/clients');
+                const clients = await res.json();
+                const c = clients.find(x => x.id == id);
+                if (!c) return;
+
+                editIdInput.value = c.id;
+                document.getElementById('fCompanyName').value = c.companyName;
+                document.getElementById('fDeviceId').value = c.deviceId;
+                document.getElementById('fLogoPath').value = c.logoPath;
+                document.getElementById('fMongoUrl').value = c.mongoUrl;
+                document.getElementById('fIpAddress').value = c.ipAddress;
+                document.getElementById('fDns').value = c.dns;
+                document.getElementById('fSubnet').value = c.subnet;
+                document.getElementById('vFrom').value = c.validFrom.slice(0,16);
+                document.getElementById('vTo').value = c.validTo.slice(0,16);
+
+                formTitle.innerText = 'Edit & Regenerate License';
+                submitBtn.innerText = 'Update & Download';
+                cancelEditBtn.classList.remove('hidden');
+                toggleView('forge');
+            };
+
+            window.toggleStatus = async (id, currentStatus) => {
+                await fetch(\`/api/clients/\${id}/status\`, { 
+                    method: 'PATCH', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ isActive: !currentStatus }) 
+                });
+                refreshClients();
+            };
+
+            window.extendLicense = async (id, months) => {
+                if (!confirm(\`Extend license by \${months} month(s) and download new file?\`)) return;
+                const res = await fetch(\`/api/clients/\${id}/extend\`, { 
+                    method: 'PATCH', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ months }) 
+                });
+                const signed = await res.json();
+                const clientsRes = await fetch('/api/clients');
+                const clients = await clientsRes.json();
+                const c = clients.find(x => x.id == id);
+                downloadLicense(signed, c.companyName);
+                refreshClients();
+            };
+
+            window.deleteClient = async (id) => {
+                if (!confirm('Are you sure? This will permanently delete the client record.')) return;
+                await fetch(\`/api/clients/\${id}\`, { method: 'DELETE' });
+                refreshClients();
+            };
+
+            forgeForm.onsubmit = async (e) => {
                 e.preventDefault();
-                const btn = e.target.querySelector('button');
-                btn.innerText = 'GENERATING...'; btn.disabled = true;
+                const btn = e.target.querySelector('#submitBtn');
+                btn.innerText = 'PROCESSING...'; btn.disabled = true;
                 try {
                     const data = Object.fromEntries(new FormData(e.target));
-                    const res = await fetch('/api/forge', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+                    const isEdit = !!editIdInput.value;
+                    const url = isEdit ? \`/api/clients/\${editIdInput.value}\` : '/api/forge';
+                    const method = isEdit ? 'PUT' : 'POST';
+
+                    const res = await fetch(url, { 
+                        method, 
+                        headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify(data) 
+                    });
                     const signed = await res.json();
-                    const blob = new Blob([JSON.stringify(signed, null, 2)], {type: 'application/json'});
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a'); a.href = url; a.download = 'license-' + data.companyName.toLowerCase().replace(/\\s+/g, '-') + '.dat'; a.click();
+                    downloadLicense(signed, data.companyName);
+                    resetForm();
                     toggleView('registry');
-                } catch (err) { alert('Error: ' + err.message); } finally { btn.innerText = 'Generate License File'; btn.disabled = false; }
+                } catch (err) { alert('Error: ' + err.message); } finally { btn.innerText = isEdit ? 'Update & Download' : 'Generate License File'; btn.disabled = false; }
             };
             refreshClients();
         </script>
