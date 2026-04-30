@@ -58,11 +58,11 @@ app.post('/api/forge', async (req, res) => {
         const licenseData = {
             companyName, deviceId, 
             validFrom, validTo,
-            logoPath: logoPath || '/uploads/logo.png',
-            mongoUrl: mongoUrl || 'mongodb://localhost:27017/nexus',
-            ipAddress: ipAddress || '127.0.0.1',
-            dns: dns || '8.8.8.8',
-            subnet: subnet || '255.255.255.0',
+            logoPath: logoPath || process.env.DEFAULT_LOGO_PATH || '/uploads/logo.png',
+            mongoUrl: mongoUrl || process.env.DEFAULT_MONGO_URL || 'mongodb://localhost:27017/nexus',
+            ipAddress: ipAddress || process.env.DEFAULT_IP_ADDRESS || '127.0.0.1',
+            dns: dns || process.env.DEFAULT_DNS || '8.8.8.8',
+            subnet: subnet || process.env.DEFAULT_SUBNET || '255.255.255.0',
             features: ["audio", "video", "weather"],
             issuedAt: new Date().toISOString()
         };

@@ -60,17 +60,20 @@ class LicenseUtils {
      * Helper to ensure deterministic JSON stringification by sorting keys.
      */
     static canonicalStringify(obj) {
+        return JSON.stringify(this.sortObject(obj));
+    }
+
+    /**
+     * Recursively sort object keys.
+     */
+    static sortObject(obj) {
         if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
-            return JSON.stringify(obj);
+            return obj;
         }
-        const sortedKeys = Object.keys(obj).sort();
-        const result = {};
-        for (const key of sortedKeys) {
-            result[key] = this.canonicalStringify(obj[key]);
-        }
-        // Use standard JSON.stringify on the object with sorted keys
-        // Note: result already has sorted keys, so JSON.stringify will follow that order.
-        return JSON.stringify(result);
+        return Object.keys(obj).sort().reduce((acc, key) => {
+            acc[key] = this.sortObject(obj[key]);
+            return acc;
+        }, {});
     }
 
     /**
@@ -101,13 +104,21 @@ class LicenseUtils {
     }
 
     /**
-     * Reads and verifies the local license.dat file.
+     * Reads and verifies the local license file.
+     * @param {string} customLicensePath - Optional override for license path
+     * @param {string} customPublicKeyPath - Optional override for public key path
      */
-    static getLocalLicense() {
+    static getLocalLicense(customLicensePath, customPublicKeyPath) {
         const path = require('path');
         const fs = require('fs');
-        const licensePath = path.join(__dirname, '../../license.dat');
-        const publicKeyPath = path.join(__dirname, '../../keys/public.pem');
+
+        const licensePath = customLicensePath || 
+            process.env.LICENSE_PATH || 
+            path.join(process.cwd(), 'license.dat');
+
+        const publicKeyPath = customPublicKeyPath || 
+            process.env.PUBLIC_KEY_PATH || 
+            path.join(process.cwd(), 'keys/public.pem');
 
         if (!fs.existsSync(licensePath) || !fs.existsSync(publicKeyPath)) return null;
 

@@ -9,8 +9,9 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-const PORT = 5099;
-const CLIENTS_FILE = path.join(__dirname, 'clients.json');
+const PORT = process.env.PORT || 5099;
+const CLIENTS_FILE = process.env.CLIENTS_FILE_PATH || path.join(__dirname, 'clients.json');
+const PRIVATE_KEY_PATH = process.env.PRIVATE_KEY_PATH || path.join(__dirname, 'keys/private.pem');
 
 const getClients = () => {
     if (!fs.existsSync(CLIENTS_FILE)) return [];
@@ -31,23 +32,21 @@ app.get('/api/clients', (req, res) => {
 
 app.post('/api/forge', (req, res) => {
     try {
-        const { 
-            companyName, deviceId, validFrom, validTo, 
-            logoPath, mongoUrl, ipAddress, dns, subnet 
+        const {
+            companyName, deviceId, validFrom, validTo,
+            logoPath, mongoUrl, ipAddress, dns, subnet
         } = req.body;
 
-        const privateKeyPath = path.join(__dirname, 'keys/private.pem');
-        const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+        const privateKey = fs.readFileSync(PRIVATE_KEY_PATH, 'utf8');
 
         const licenseData = {
-            companyName, deviceId, 
+            companyName, deviceId,
             validFrom, validTo,
-            logoPath: logoPath || '/uploads/logo.png',
-            mongoUrl: mongoUrl || 'mongodb://localhost:27017/nexus',
-            ipAddress: ipAddress || '127.0.0.1',
-            dns: dns || '8.8.8.8',
-            subnet: subnet || '255.255.255.0',
-            features: ["audio", "video", "weather"],
+            logoPath: logoPath || process.env.DEFAULT_LOGO_PATH || '/uploads/logo.png',
+            mongoUrl: mongoUrl || process.env.DEFAULT_MONGO_URL || 'mongodb://localhost:27017/nexus',
+            ipAddress: ipAddress || process.env.DEFAULT_IP_ADDRESS || '127.0.0.1',
+            dns: dns || process.env.DEFAULT_DNS || '8.8.8.8',
+            subnet: subnet || process.env.DEFAULT_SUBNET || '255.255.255.0',
             issuedAt: new Date().toISOString()
         };
 
