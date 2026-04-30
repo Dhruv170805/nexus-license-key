@@ -23,7 +23,7 @@ const clientSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: true }
 });
 
-const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
+const Client = mongoose.models.Client || mongoose.model('Client', clientSchema, 'clientkeydata');
 
 const connectDB = async () => {
     if (mongoose.connection.readyState >= 1) return;
