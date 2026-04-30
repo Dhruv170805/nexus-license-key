@@ -27,10 +27,18 @@ const Client = mongoose.models.Client || mongoose.model('Client', clientSchema);
 
 const connectDB = async () => {
     if (mongoose.connection.readyState >= 1) return;
+    
+    if (!process.env.MONGODB_URI) {
+        console.error('MONGODB_URI is missing from environment variables');
+        throw new Error('Database connection string (MONGODB_URI) is not configured.');
+    }
+
     try {
         await mongoose.connect(process.env.MONGODB_URI);
+        console.log('Successfully connected to MongoDB Atlas');
     } catch (err) {
         console.error('ATLAS CONNECTION ERROR:', err);
+        throw new Error('Failed to connect to MongoDB Atlas: ' + err.message);
     }
 };
 
