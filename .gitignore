@@ -5,3 +5,6 @@ node_modules/
 dist/
 build/
 .vercel
+public.pem
+private.pem
+clients.json

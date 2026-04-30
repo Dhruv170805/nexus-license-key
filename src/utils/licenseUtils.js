@@ -34,7 +34,7 @@ class LicenseUtils {
      */
     static signLicense(data, privateKey) {
         const sign = crypto.createSign('SHA256');
-        sign.update(JSON.stringify(data));
+        sign.update(this.canonicalStringify(data));
         sign.end();
         const signature = sign.sign(privateKey, 'hex');
         return { data, signature };
@@ -45,13 +45,32 @@ class LicenseUtils {
      */
     static verifyLicense(licenseObj, publicKey) {
         try {
+            if (!licenseObj || !licenseObj.data || !licenseObj.signature) return false;
             const verify = crypto.createVerify('SHA256');
-            verify.update(JSON.stringify(licenseObj.data));
+            verify.update(this.canonicalStringify(licenseObj.data));
             verify.end();
             return verify.verify(publicKey, licenseObj.signature, 'hex');
         } catch (err) {
+            console.error('[License] Verification Error:', err.message);
             return false;
         }
+    }
+
+    /**
+     * Helper to ensure deterministic JSON stringification by sorting keys.
+     */
+    static canonicalStringify(obj) {
+        if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+            return JSON.stringify(obj);
+        }
+        const sortedKeys = Object.keys(obj).sort();
+        const result = {};
+        for (const key of sortedKeys) {
+            result[key] = this.canonicalStringify(obj[key]);
+        }
+        // Use standard JSON.stringify on the object with sorted keys
+        // Note: result already has sorted keys, so JSON.stringify will follow that order.
+        return JSON.stringify(result);
     }
 
     /**
@@ -87,7 +106,7 @@ class LicenseUtils {
     static getLocalLicense() {
         const path = require('path');
         const fs = require('fs');
-        const licensePath = path.join(__dirname, '../../../license.dat');
+        const licensePath = path.join(__dirname, '../../license.dat');
         const publicKeyPath = path.join(__dirname, '../../keys/public.pem');
 
         if (!fs.existsSync(licensePath) || !fs.existsSync(publicKeyPath)) return null;
@@ -96,8 +115,14 @@ class LicenseUtils {
             const licenseObj = JSON.parse(fs.readFileSync(licensePath, 'utf8'));
             const publicKey = fs.readFileSync(publicKeyPath, 'utf8');
             const result = this.validateFull(licenseObj, publicKey);
-            return result.valid ? result.data : null;
+            
+            if (!result.valid) {
+                console.error(`[License] Validation Failed: ${result.message}`);
+                return null;
+            }
+            return result.data;
         } catch (err) {
+            console.error('[License] Read Error:', err.message);
             return null;
         }
     }

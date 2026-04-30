@@ -1,6 +1,42 @@
 [
   {
     "companyName": "PR",
+    "deviceId": "051b59c253f043090d6e1b1e7781b20d705f4a5194f13b6f8def571ecfdcf7c2",
+    "validFrom": "2026-04-30T06:45",
+    "validTo": "2027-04-30T06:45",
+    "logoPath": "C:\\Users\\wellcome\\Downloads\\print_electronics_equipment_pvt_ltd_logo",
+    "mongoUrl": "MongoDB://localhost:27017/",
+    "ipAddress": " 192.168.1.8",
+    "dns": "116.74.100.29",
+    "subnet": "255.255.255.0",
+    "features": [
+      "audio",
+      "video",
+      "weather"
+    ],
+    "issuedAt": "2026-04-30T07:04:15.647Z",
+    "id": 1777532655651
+  },
+  {
+    "companyName": "PR",
+    "deviceId": "051b59c253f043090d6e1b1e7781b20d705f4a5194f13b6f8def571ecfdcf7c2",
+    "validFrom": "2026-04-30T06:45",
+    "validTo": "2027-04-30T06:45",
+    "logoPath": "C:\\Users\\wellcome\\Downloads\\print_electronics_equipment_pvt_ltd_logo",
+    "mongoUrl": "MongoDB://localhost:27017/",
+    "ipAddress": " 192.168.1.8",
+    "dns": "116.74.100.29",
+    "subnet": "255.255.255.0",
+    "features": [
+      "audio",
+      "video",
+      "weather"
+    ],
+    "issuedAt": "2026-04-30T06:46:28.688Z",
+    "id": 1777531588693
+  },
+  {
+    "companyName": "PR",
     "deviceId": "8BBD3304-60A7-429E-8BF5-9703496C8E8A",
     "validFrom": "2026-04-30T06:38",
     "validTo": "2027-04-29T06:38",
