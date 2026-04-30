@@ -19,7 +19,6 @@ const clientSchema = new mongoose.Schema({
     ipAddress: String,
     dns: String,
     subnet: String,
-    features: [String],
     issuedAt: { type: Date, default: Date.now },
     isActive: { type: Boolean, default: true }
 });
@@ -66,7 +65,6 @@ app.post('/api/forge', async (req, res) => {
             ipAddress: ipAddress || process.env.DEFAULT_IP_ADDRESS || '127.0.0.1',
             dns: dns || process.env.DEFAULT_DNS || '8.8.8.8',
             subnet: subnet || process.env.DEFAULT_SUBNET || '255.255.255.0',
-            features: ["audio", "video", "weather"],
             issuedAt: new Date().toISOString()
         };
 
@@ -97,7 +95,6 @@ app.put('/api/clients/:id', async (req, res) => {
             ipAddress: updateData.ipAddress,
             dns: updateData.dns,
             subnet: updateData.subnet,
-            features: updateData.features || ["audio", "video", "weather"],
             issuedAt: new Date().toISOString()
         };
 
@@ -146,7 +143,6 @@ app.patch('/api/clients/:id/extend', async (req, res) => {
             ipAddress: client.ipAddress,
             dns: client.dns,
             subnet: client.subnet,
-            features: client.features,
             issuedAt: new Date().toISOString()
         };
 

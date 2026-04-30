@@ -30,7 +30,7 @@ The client application must use `LicenseUtils.getDeviceId()` on the target machi
 ### Step 2: Generation
 1. Access the production Nexus Forge instance.
 2. Enter the Client Name and the Hardware ID obtained in Step 1.
-3. Define the license parameters (Start Date, Expiry, Features).
+3. Define the license parameters (Start Date, Expiry).
 4. Click **Generate**.
 
 ### Step 3: Distribution
