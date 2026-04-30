@@ -12,10 +12,12 @@ This document describes the standard development and operational workflows for N
 ### 2. Testing
 - Verify license generation via the local dashboard (`http://localhost:5099`).
 - Use the `LicenseUtils` to verify that generated licenses are valid and correctly bound to the hardware signature.
+- **Note:** The verification engine uses canonical stringification. If testing manually, ensure keys are sorted or use `LicenseUtils.canonicalStringify()`.
 
 ### 3. Code Review & Integration
 - Push branch to origin and create a Pull Request.
 - Ensure all code follows existing patterns (e.g., using `LicenseUtils` for crypto operations).
+- **Never commit `node_modules`, `.env`, or `.pem` keys.** These are ignored via `.gitignore`.
 - Merge to `main` after approval.
 
 ## 🔑 License Issuance Workflow

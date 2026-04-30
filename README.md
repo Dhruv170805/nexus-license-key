@@ -4,6 +4,8 @@ Nexus Forge is a standalone license generation and management tool designed to s
 
 ## 🚀 Features
 
+- **Deterministic Signatures:** Implements canonical JSON stringification (sorted keys) to ensure signature stability across different environments.
+- **Environment Driven:** Fully configurable via environment variables (Paths, Ports, Default values).
 - **Hardware Binding:** Generates unique Device IDs based on hardware signatures (MAC, CPU, Hostname).
 - **Secure Signing:** Uses SHA256 digital signatures to prevent license tampering.
 - **Dual Mode Deployment:**
@@ -17,7 +19,7 @@ Nexus Forge is a standalone license generation and management tool designed to s
 - **Backend:** Node.js, Express
 - **Database:** MongoDB Atlas (Cloud) / Local JSON (Standalone)
 - **Styling:** Tailwind CSS
-- **Cryptography:** Node.js `crypto` module
+- **Cryptography:** Node.js `crypto` module (SHA256 with RSA)
 - **Deployment:** Vercel
 
 ## 📦 Getting Started
@@ -42,6 +44,21 @@ Nexus Forge is a standalone license generation and management tool designed to s
 
 3. Setup Keys:
    Place your RSA private key in `keys/private.pem` for local development.
+
+### Configuration (Environment Variables)
+
+The system is highly configurable via `.env` or system environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Forge Server Port | `5099` |
+| `PRIVATE_KEY_PATH` | Path to RSA private key | `keys/private.pem` |
+| `PUBLIC_KEY_PATH` | Path to RSA public key | `keys/public.pem` |
+| `LICENSE_PATH` | Path to `license.dat` | `license.dat` |
+| `CLIENTS_FILE_PATH`| Path to `clients.json` | `clients.json` |
+| `MONGODB_URI` | Atlas connection string | `—` |
+| `DEFAULT_MONGO_URL`| Default client DB link | `mongodb://localhost:27017/nexus` |
+| `DEFAULT_IP_ADDRESS`| Default client IP | `127.0.0.1` |
 
 ### Running Locally
 

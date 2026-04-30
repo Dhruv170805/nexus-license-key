@@ -6,23 +6,23 @@ This document outlines the Site Reliability Engineering (SRE) practices and oper
 
 - **Availability:** 99.9% uptime for the license generation API.
 - **Latency:** 95% of license generation requests should complete under 200ms.
-- **Data Integrity:** Zero tolerance for unauthorized license modifications or database corruption.
+- **Data Integrity:** Zero tolerance for unauthorized license modifications or database corruption. Uses canonical JSON stringification to ensure cryptographic consistency.
 
 ## 🛠 Infrastructure & Deployment
 
 ### Environment Strategies
-- **Development:** Local execution via `forge-server.js` using `clients.json`.
+- **Development:** Local execution via `forge-server.js` using `clients.json`. Configurable via `PRIVATE_KEY_PATH` and `CLIENTS_FILE_PATH`.
 - **Production:** Serverless deployment on Vercel using MongoDB Atlas.
 
 ### Deployment Pipeline
-1. **Validation:** Linting and local testing.
+1. **Validation:** Linting and local testing. Ensure `public.pem` matches `private.pem`.
 2. **Staging:** Deployment to a Vercel preview branch.
 3. **Production:** Merging to `main` triggers automatic deployment to Vercel production.
 
 ## 🛡 Security Operations
 
 ### Secret Management
-- **Private Keys:** Stored in Vercel Environment Variables (`PRIVATE_KEY`). Never log or print the private key.
+- **Private Keys:** Stored in Vercel Environment Variables (`PRIVATE_KEY`) or at `PRIVATE_KEY_PATH`. Never log or print the private key.
 - **Database Credentials:** Managed via `MONGODB_URI` environment variable.
 
 ### Access Control
