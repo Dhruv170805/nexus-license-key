@@ -44,26 +44,51 @@ const connectDB = async () => {
 
 const getPrivateKey = () => {
     const key = process.env.PRIVATE_KEY || process.env.PRIVATE_KEY_PATH;
-    if (!key) return null;
+    if (!key) {
+        console.error('No private key found in PRIVATE_KEY or PRIVATE_KEY_PATH env vars');
+        return null;
+    }
+    
+    // If it looks like a path (no PEM header) and we are in Vercel, warn the user
+    if (!key.includes('-----BEGIN RSA PRIVATE KEY-----') && !key.includes('-----BEGIN PRIVATE KEY-----')) {
+        if (key.endsWith('.pem') || key.includes('/') || key.includes('\\')) {
+            console.error('PRIVATE_KEY_PATH seems to be a file path, but api/index.js expects the actual key content in the environment variable for Vercel deployment.');
+        }
+    }
+
     return key.replace(/\\n/g, '\n');
 };
 
 app.get('/api/clients', async (req, res) => {
-    await connectDB();
-    const clients = await Client.find().sort({ issuedAt: -1 });
-    res.json(clients);
+    try {
+        await connectDB();
+        const clients = await Client.find().sort({ issuedAt: -1 });
+        console.log(`Fetched ${clients.length} clients from Atlas`);
+        res.json(clients);
+    } catch (err) {
+        console.error('GET /api/clients error:', err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/forge', async (req, res) => {
     try {
+        console.log('POST /api/forge - Request received');
         await connectDB();
         const { 
             companyName, deviceId, validFrom, validTo, 
             logoPath, mongoUrl, ipAddress, dns, subnet 
         } = req.body;
 
+        if (!companyName || !deviceId) {
+            return res.status(400).json({ error: 'Company Name and Device ID are required.' });
+        }
+
         const privateKey = getPrivateKey();
-        if (!privateKey) return res.status(500).json({ message: 'PRIVATE_KEY is missing.' });
+        if (!privateKey) {
+            console.error('PRIVATE_KEY is missing');
+            return res.status(500).json({ message: 'PRIVATE_KEY is missing.' });
+        }
 
         const licenseData = {
             companyName, deviceId, 
@@ -77,9 +102,14 @@ app.post('/api/forge', async (req, res) => {
         };
 
         const signed = LicenseUtils.signLicense(licenseData, privateKey);
-        await Client.create({ ...licenseData, isActive: true });
+        console.log('License signed successfully. Saving to Atlas...');
+        
+        const createdClient = await Client.create({ ...licenseData, isActive: true });
+        console.log('Client record saved to Atlas:', createdClient._id);
+        
         res.json(signed);
     } catch (err) {
+        console.error('POST /api/forge error:', err);
         res.status(500).json({ error: err.message });
     }
 });
